@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestionale Corso MKTG 600h - OFFLINE Modificabile</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#f3f3f3;color:#222}
+header{background:#0078D4;color:white;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+header h1{font-size:18px}
+.btn{padding:6px 12px;border:1px solid #0078D4;background:white;color:#0078D4;border-radius:4px;cursor:pointer;font-size:13px}
+.btn-primary{background:#0078D4;color:white;border-color:#0078D4}
+.btn-danger{background:#d13438;color:white;border:none}
+.btn-small{padding:3px 8px;font-size:11px}
+.toolbar{background:white;padding:10px 20px;border-bottom:1px solid #ddd;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.kpi{display:flex;gap:12px;flex-wrap:wrap;padding:15px 20px}
+.kpi-card{background:white;padding:12px 16px;border-radius:6px;box-shadow:0 1px 3px rgba(0,0,0,0.1);min-width:140px}
+.kpi-card b{display:block;font-size:20px;color:#0078D4}
+.tabs{display:flex;background:white;border-bottom:2px solid #0078D4;padding:0 20px;gap:2px;flex-wrap:wrap}
+.tab{padding:10px 18px;cursor:pointer;border:none;background:#eee;border-radius:4px 4px 0 0}
+.tab.active{background:#0078D4;color:white}
+.content{padding:20px}
+table{width:100%;border-collapse:collapse;background:white;font-size:13px}
+th{background:#0078D4;color:white;padding:8px 6px;text-align:left;position:sticky;top:0}
+td{padding:6px;border-bottom:1px solid #e0e0e0}
+tr:hover{background:#f0f8ff}
+td[contenteditable="true"]{background:#fffbe6;outline:1px dashed #0078D4}
+.filters{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.filters select,.filters input{padding:6px;border:1px solid #ccc;border-radius:4px}
+.edit-badge{background:#ffb900;color:black;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:10px}
+.drag-handle{cursor:grab;color:#999}
+@media print{header,.toolbar,.tabs,.filters,button{display:none} #registroContent{display:block!important}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>📘 Corso Marketing 600h - OFFLINE Modificabile <span id="editBadge" style="display:none" class="edit-badge">MODIFICA ATTIVA</span></h1>
+<small>16/11/2026 - 21/06/2027 | Lun-Ven 09:00-13:00 | 420h aula + 180h stage | Versione Offline USB</small></div>
+<div>
+<button class="btn btn-primary" id="toggleEdit">✏️ Attiva Modifica</button>
+<button class="btn" onclick="exportExcel()">📥 Excel</button>
+<button class="btn" onclick="exportJSON()">📥 JSON</button>
+<button class="btn" onclick="exportSQL()">📥 SQL Access</button>
+<button class="btn btn-danger" onclick="resetData()">↺ Ripristina</button>
+</div>
+</header>
+
+<div class="toolbar">
+<label>Data inizio: <input type="date" id="startDate" value="2026-11-16"></label>
+<label>Orario: <input type="text" id="orario" value="09:00-13:00" style="width:110px"></label>
+<label>Festività (gg/mm): <input type="text" id="festivi" value="08/12,25/12,26/12,01/01,06/01,28/03,29/03,25/04,01/05,02/06" style="width:350px"></label>
+<button class="btn btn-primary" onclick="ricalcolaDate()">🔄 Ricalcola Date</button>
+<span id="saveStatus" style="margin-left:20px;color:green;font-size:12px"></span>
+</div>
+
+<div class="kpi" id="kpi"></div>
+
+<div class="tabs">
+<button class="tab active" onclick="showTab('calendario')">📅 Calendario (<span id="countCal"></span>)</button>
+<button class="tab" onclick="showTab('moduli')">📚 Moduli (<span id="countMod"></span>)</button>
+<button class="tab" onclick="showTab('docenti')">👨‍🏫 Docenti (<span id="countDoc"></span>)</button>
+<button class="tab" onclick="showTab('query')">📊 Query</button>
+<button class="tab" onclick="showTab('registro')">📝 Registro</button>
+</div>
+
+<div class="content">
+<div id="tab-calendario">
+<div class="filters">
+<select id="filtroUF" onchange="renderCalendario()"><option value="">Tutti UF</option></select>
+<select id="filtroDoc" onchange="renderCalendario()"><option value="">Tutti Docenti</option></select>
+<select id="filtroFase" onchange="renderCalendario()"><option value="">Tutte Fasi</option><option value="AULA">AULA</option><option value="STAGE">STAGE</option></select>
+<input type="text" id="searchCal" placeholder="Cerca modulo..." oninput="renderCalendario()" style="width:200px">
+<button class="btn btn-primary" onclick="addRow()">+ Aggiungi Giornata</button>
+</div>
+<div style="max-height:60vh;overflow:auto">
+<table id="tblCal"><thead><tr><th>⋮⋮</th><th>ID</th><th>Data</th><th>Giorno</th><th>Orario</th><th>Ore</th><th>UF</th><th>Modulo</th><th>Docente</th><th>Fase</th><th>Aula</th><th>Azioni</th></tr></thead><tbody></tbody></table>
+</div>
+</div>
+
+<div id="tab-moduli" style="display:none">
+<div style="margin-bottom:10px"><button class="btn btn-primary" onclick="addModulo()">+ Aggiungi Modulo</button></div>
+<table id="tblMod"><thead><tr><th>UF</th><th>Modulo</th><th>Ore</th><th>Docente</th><th>Azioni</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div id="tab-docenti" style="display:none">
+<div style="margin-bottom:10px"><button class="btn btn-primary" onclick="addDocente()">+ Aggiungi Docente</button></div>
+<table id="tblDoc"><thead><tr><th>Docente</th><th>Ore Totali</th><th>Azioni</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div id="tab-query" style="display:none">
+<h3>Ore per Docente</h3><table id="tblQDoc"><thead><tr><th>Docente</th><th>Ore</th><th>Giorni</th></tr></thead><tbody></tbody></table>
+<h3 style="margin-top:20px">Ore per UF</h3><table id="tblQUF"><thead><tr><th>UF</th><th>Ore</th></tr></thead><tbody></tbody></table>
+</div>
+
+<div id="tab-registro" style="display:none">
+<div class="filters">
+<label>Data registro: <input type="date" id="regDate" value="2026-11-16"></label>
+<button class="btn" onclick="renderRegistro()">Mostra</button>
+<button class="btn btn-primary" onclick="window.print()">🖨️ Stampa</button>
+</div>
+<div id="registroContent" style="background:white;padding:20px;border:1px solid #ddd;margin-top:10px"></div>
+</div>
+</div>
+
+<script>
+const STORAGE_KEY="corso_mktg_editable_offline_v3";
+const MODULI_INIT=[
+["Il mercato e il marketing","I fondamenti del marketing",10,"FILOMENA RIGNANESE"],
+["Il mercato e il marketing","Targeting e segmentazione del mercato",10,"FILOMENA RIGNANESE"],
+["Il mercato e il marketing","Le ricerche di mercato",5,"DEA FURII"],
+["Il mercato e il marketing","Marketing strategico e operativo",10,"MICHELE DE MEO"],
+["Il mercato e il marketing","Informatica di base",25,"MICHELE VALENTE"],
+["Il mercato e il marketing","Informatica per il Marketing",10,"MICHELE VALENTE"],
+["Il mercato e il marketing","La cultura della sicurezza sul lavoro",20,"MATTEO ROBUSTELLA"],
+["Marketing management","Organizzazione Aziendale e Pianificazione Strategica",14,"GILDA IAVARONE / ETTORE RUGGIERO"],
+["Marketing management","Il marketing management",14,"ETTORE RUGGIERO / FILOMENA RIGNANESE"],
+["Marketing management","Metodologie e strumenti di benchmarking",10,"ETTORE RUGGIERO"],
+["Marketing management","Normativa sul marchio, brevetti, contrattazione internazionale",6,"MARIANGELA SANTAMARIA"],
+["Marketing management","Il mercato estero",8,"KATIANA IAVARONE"],
+["Marketing management","Lingua Inglese per il Marketing",20,"LISA MARIGONDA"],
+["Il prodotto/servizio","Il Prodotto",14,"DEA FURII / BERNADETTE BEVERELLI"],
+["Il prodotto/servizio","Pricing",10,"ANTONIO GISOLFI"],
+["Il prodotto/servizio","Placement",12,"ANTONIO DE MICHELE"],
+["Il prodotto/servizio","Tecniche di organizzazione e gestione rete vendita, l’e-commerce",10,"ANTONIO DE MICHELE"],
+["Il prodotto/servizio","Tecniche di analisi economiche e di budgeting",10,"ANTONIO GISOLFI"],
+["Comunicazione e vendita","Comunicazione Interpersonale",8,"ROBERTA MARAZIA"],
+["Comunicazione e vendita","Tecniche di Persuasione e Comunicazione",14,"FILOMENA RIGNANESE"],
+["Comunicazione e vendita","Strumenti di Promozione Tradizionali",10,"GIUSEPPE FRATTAROLO"],
+["Comunicazione e vendita","La Promozione Digitale",22,"BERNADETTE BEVERELLI"],
+["Comunicazione e vendita","Intelligenza Artificiale nel Marketing",15,"BERNADETTE BEVERELLI"],
+["Comunicazione e vendita","Misurazione dell'Efficacia delle Strategie Promozionali",10,"DEA FURII"],
+["Comunicazione e vendita","Comunicazione online e offline integrata",5,"ANTONIO DE MICHELE"],
+["Comunicazione e vendita","Il green marketing e l’impatto sociale",12,"BERNADETTE BEVERELLI"],
+["Il Piano di Marketing","Report di Vendita",10,"ANTONIO DE MICHELE"],
+["Il Piano di Marketing","Customer Satisfaction",8,"MICHELE DE MEO"],
+["Il Piano di Marketing","La Concorrenza",8,"MICHELE DE MEO"],
+["Il Piano di Marketing","Il Piano di Marketing",14,"FILOMENA RIGNANESE e BERNADETTE BEVERELLI"],
+["Il Piano di Marketing","Comunicazione efficace",20,"FILOMENA RIGNANESE"],
+["Il Piano di Marketing","Project Work",30,"FILOMENA RIGNANESE e BERNADETTE BEVERELLI"],
+["Il Piano di Marketing","Visite Guidate",16,"DA DEFINIRE"]
+];
+
+let editMode=false;
+let calendario=[];
+let moduli=[];
+
+function parseFestivi(str){
+  const set=new Set();
+  str.split(',').forEach(s=>{
+    const parts=s.trim().split('/');
+    if(parts.length===2){
+      const d=parseInt(parts[0]); const m=parseInt(parts[1]);
+      if(d&&m){ set.add(String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0')); }
+    }
+  });
+  return set;
+}
+function genDate(startStr, numAula, numStage){
+  const festivi=parseFestivi(document.getElementById('festivi').value);
+  const start=new Date(startStr);
+  const aulaDays=[];
+  let cur=new Date(start);
+  while(aulaDays.length<numAula){
+    const day=cur.getDay();
+    const mmdd=String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    if(day!==0 && day!==6 && !festivi.has(mmdd)){ aulaDays.push(new Date(cur)); }
+    cur.setDate(cur.getDate()+1);
+  }
+  const stageDays=[];
+  while(stageDays.length<numStage){
+    const day=cur.getDay();
+    const mmdd=String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    if(day!==0 && day!==6 && !festivi.has(mmdd)){ stageDays.push(new Date(cur)); }
+    cur.setDate(cur.getDate()+1);
+  }
+  return {aulaDays, stageDays};
+}
+function buildInitial(){
+  const festivi=parseFestivi("08/12,25/12,26/12,01/01,06/01,28/03,29/03,25/04,01/05,02/06");
+  const start=new Date("2026-11-16");
+  const aulaDays=[]; let cur=new Date(start);
+  while(aulaDays.length<105){
+    const day=cur.getDay();
+    const mmdd=String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    if(day!==0 && day!==6 && !festivi.has(mmdd)){ aulaDays.push(new Date(cur)); }
+    cur.setDate(cur.getDate()+1);
+  }
+  const stageDays=[];
+  while(stageDays.length<45){
+    const day=cur.getDay();
+    const mmdd=String(cur.getMonth()+1).padStart(2,'0')+'-'+String(cur.getDate()).padStart(2,'0');
+    if(day!==0 && day!==6 && !festivi.has(mmdd)){ stageDays.push(new Date(cur)); }
+    cur.setDate(cur.getDate()+1);
+  }
+  let queue=MODULI_INIT.map(m=>({UF:m[0],Mod:m[1],Tot:m[2],Rem:m[2],Doc:m[3]}));
+  let rows=[]; let modIdx=0; let id=1;
+  const giorni=["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"];
+  aulaDays.forEach(d=>{
+    let oreG=4;
+    while(oreG>0 && modIdx<queue.length){
+      let curQ=queue[modIdx];
+      let take=Math.min(curQ.Rem,oreG);
+      rows.push({ID:id++,Data:d.toISOString().slice(0,10),DataStr:d.toLocaleDateString('it-IT'),Giorno:giorni[d.getDay()],OraInizio:"09:00",OraFine:"13:00",Ore:take,UF:curQ.UF,Modulo:curQ.Mod,Docente:curQ.Doc,Fase:"AULA",Aula:"Aula 1"});
+      curQ.Rem-=take; oreG-=take;
+      if(curQ.Rem===0) modIdx++;
+    }
+  });
+  stageDays.forEach(d=>{
+    rows.push({ID:id++,Data:d.toISOString().slice(0,10),DataStr:d.toLocaleDateString('it-IT'),Giorno:giorni[d.getDay()],OraInizio:"09:00",OraFine:"13:00",Ore:4,UF:"STAGE",Modulo:"Stage in azienda",Docente:"Tutor Aziendale",Fase:"STAGE",Aula:"Azienda"});
+  });
+  return rows;
+}
+function load(){
+  const saved=localStorage.getItem(STORAGE_KEY);
+  if(saved){
+    try{
+      const data=JSON.parse(saved);
+      calendario=data.calendario||buildInitial();
+      moduli=data.moduli||MODULI_INIT.map(m=>({UF:m[0],Modulo:m[1],Ore:m[2],Docente:m[3]}));
+      return;
+    }catch(e){}
+  }
+  calendario=buildInitial();
+  moduli=MODULI_INIT.map(m=>({UF:m[0],Modulo:m[1],Ore:m[2],Docente:m[3]}));
+}
+function save(){
+  localStorage.setItem(STORAGE_KEY,JSON.stringify({calendario,moduli}));
+  const el=document.getElementById('saveStatus');
+  if(el){ el.innerText="✓ Salvato "+new Date().toLocaleTimeString(); setTimeout(()=>el.innerText="",2000); }
+  updateKPI();
+}
+function updateKPI(){
+  const tot=calendario.reduce((s,r)=>s+r.Ore,0);
+  const aula=calendario.filter(r=>r.Fase==="AULA").reduce((s,r)=>s+r.Ore,0);
+  const stage=calendario.filter(r=>r.Fase==="STAGE").reduce((s,r)=>s+r.Ore,0);
+  const docSet=new Set(calendario.map(r=>r.Docente));
+  const el=document.getElementById('kpi');
+  if(!el) return;
+  el.innerHTML=`<div class="kpi-card"><b>${tot}h</b><small>Totale</small></div><div class="kpi-card"><b>${aula}h</b><small>Aula (${calendario.filter(r=>r.Fase==="AULA").length} gg)</small></div><div class="kpi-card"><b>${stage}h</b><small>Stage (${calendario.filter(r=>r.Fase==="STAGE").length} gg)</small></div><div class="kpi-card"><b>${docSet.size}</b><small>Docenti</small></div><div class="kpi-card"><b>${moduli.length}</b><small>Moduli</small></div><div class="kpi-card"><b>${calendario[0]?.DataStr||""}</b><small>Inizio</small></div><div class="kpi-card"><b>${calendario[calendario.length-1]?.DataStr||""}</b><small>Fine</small></div>`;
+  const cc=document.getElementById('countCal'); if(cc) cc.innerText=calendario.length;
+  const cm=document.getElementById('countMod'); if(cm) cm.innerText=moduli.length;
+  const cd=document.getElementById('countDoc'); if(cd) cd.innerText=new Set(moduli.map(m=>m.Docente)).size;
+  const ufSet=[...new Set(calendario.map(r=>r.UF))];
+  const docSet2=[...new Set(calendario.map(r=>r.Docente))];
+  const selUF=document.getElementById('filtroUF'); if(selUF){ const curUF=selUF.value; selUF.innerHTML='<option value="">Tutti UF</option>'+ufSet.map(u=>`<option ${u===curUF?'selected':''}>${u}</option>`).join(''); }
+  const selDoc=document.getElementById('filtroDoc'); if(selDoc){ const curDoc=selDoc.value; selDoc.innerHTML='<option value="">Tutti Docenti</option>'+docSet2.map(d=>`<option ${d===curDoc?'selected':''}>${d}</option>`).join(''); }
+}
+function renderCalendario(){
+  const ufEl=document.getElementById('filtroUF'); const uf=ufEl?ufEl.value:"";
+  const docEl=document.getElementById('filtroDoc'); const doc=docEl?docEl.value:"";
+  const faseEl=document.getElementById('filtroFase'); const fase=faseEl?faseEl.value:"";
+  const searchEl=document.getElementById('searchCal'); const search=searchEl?searchEl.value.toLowerCase():"";
+  let filtered=calendario.filter(r=>{
+    if(uf && r.UF!==uf) return false;
+    if(doc && r.Docente!==doc) return false;
+    if(fase && r.Fase!==fase) return false;
+    if(search && !r.Modulo.toLowerCase().includes(search) && !r.UF.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const tbody=document.querySelector('#tblCal tbody');
+  if(!tbody) return;
+  tbody.innerHTML=filtered.map(r=>`
+    <tr draggable="${editMode}" data-id="${r.ID}">
+      <td class="drag-handle">⋮⋮</td>
+      <td>${r.ID}</td>
+      <td ${editMode?'contenteditable="true" data-field="Data"':''}>${r.Data}</td>
+      <td>${r.Giorno}</td>
+      <td ${editMode?'contenteditable="true" data-field="OraInizio"':''}>${r.OraInizio}-${r.OraFine}</td>
+      <td ${editMode?'contenteditable="true" data-field="Ore"':''}>${r.Ore}</td>
+      <td ${editMode?'contenteditable="true" data-field="UF"':''}>${r.UF}</td>
+      <td ${editMode?'contenteditable="true" data-field="Modulo"':''}>${r.Modulo}</td>
+      <td ${editMode?'contenteditable="true" data-field="Docente"':''}>${r.Docente}</td>
+      <td>${r.Fase}</td>
+      <td ${editMode?'contenteditable="true" data-field="Aula"':''}>${r.Aula}</td>
+      <td>${editMode?`<button class="btn btn-danger btn-small" onclick="deleteRow(${r.ID})">🗑️</button>`:""}</td>
+    </tr>
+  `).join('');
+  if(editMode){
+    tbody.querySelectorAll('[contenteditable="true"]').forEach(cell=>{
+      cell.addEventListener('blur', (e)=>{
+        const tr=e.target.closest('tr');
+        const id=parseInt(tr.dataset.id);
+        const field=e.target.dataset.field;
+        let val=e.target.innerText.trim();
+        const row=calendario.find(r=>r.ID===id);
+        if(!row) return;
+        if(field==="Ore") val=parseInt(val)||row.Ore;
+        if(field==="Data"){
+          row.Data=val;
+          try{ const d=new Date(val); row.DataStr=d.toLocaleDateString('it-IT'); row.Giorno=["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"][d.getDay()]; }catch{}
+        }else if(field==="OraInizio" && val.includes('-')){
+          const parts=val.split('-'); row.OraInizio=parts[0].trim(); row.OraFine=parts[1].trim();
+        }else{ row[field]=val; }
+        save(); renderCalendario();
+      });
+    });
+  }
+  renderQuery();
+}
+function renderModuli(){
+  const tbody=document.querySelector('#tblMod tbody'); if(!tbody) return;
+  tbody.innerHTML=moduli.map((m,i)=>`<tr><td ${editMode?'contenteditable="true" data-i="'+i+'" data-f="UF"':''}>${m.UF}</td><td ${editMode?'contenteditable="true" data-i="'+i+'" data-f="Modulo"':''}>${m.Modulo}</td><td ${editMode?'contenteditable="true" data-i="'+i+'" data-f="Ore"':''}>${m.Ore}</td><td ${editMode?'contenteditable="true" data-i="'+i+'" data-f="Docente"':''}>${m.Docente}</td><td>${editMode?`<button class="btn btn-danger btn-small" onclick="deleteModulo(${i})">🗑️</button>`:""}</td></tr>`).join('');
+  if(editMode){
+    tbody.querySelectorAll('[contenteditable="true"]').forEach(cell=>{
+      cell.addEventListener('blur', e=>{
+        const i=parseInt(e.target.dataset.i); const f=e.target.dataset.f; let v=e.target.innerText.trim();
+        if(f==="Ore") v=parseInt(v)||moduli[i][f];
+        moduli[i][f]=v; save(); renderModuli(); updateKPI();
+      });
+    });
+  }
+}
+function renderDocenti(){
+  const map={};
+  calendario.forEach(r=>{ map[r.Docente]=(map[r.Docente]||0)+r.Ore; });
+  const tbody=document.querySelector('#tblDoc tbody'); if(!tbody) return;
+  tbody.innerHTML=Object.entries(map).map(([doc,ore])=>`<tr><td>${doc}</td><td>${ore}h</td><td>${editMode?`<button class="btn btn-danger btn-small" onclick="deleteDocente('${doc.replace(/'/g,"\\'")}')">🗑️</button>`:""}</td></tr>`).join('');
+}
+function renderQuery(){
+  const byDoc={}; const byUF={};
+  calendario.forEach(r=>{ byDoc[r.Docente]=(byDoc[r.Docente]||0)+r.Ore; byUF[r.UF]=(byUF[r.UF]||0)+r.Ore; });
+  const t1=document.querySelector('#tblQDoc tbody'); if(t1) t1.innerHTML=Object.entries(byDoc).sort((a,b)=>b[1]-a[1]).map(([d,o])=>`<tr><td>${d}</td><td>${o}h</td><td>${Math.ceil(o/4)} gg</td></tr>`).join('');
+  const t2=document.querySelector('#tblQUF tbody'); if(t2) t2.innerHTML=Object.entries(byUF).map(([u,o])=>`<tr><td>${u}</td><td>${o}h</td></tr>`).join('');
+}
+function renderRegistro(){
+  const dEl=document.getElementById('regDate'); const d=dEl?dEl.value:"";
+  if(!d){ alert("Seleziona data"); return; }
+  const rows=calendario.filter(r=>r.Data===d);
+  const cont=document.getElementById('registroContent');
+  if(rows.length===0){ cont.innerHTML="<p>Nessuna lezione in questa data</p>"; return; }
+  const r=rows[0];
+  cont.innerHTML=`<h2>Registro Giornaliero - Corso Marketing 600h</h2><p><b>Data:</b> ${new Date(d).toLocaleDateString('it-IT')} (${r.Giorno}) | <b>Orario:</b> ${r.OraInizio}-${r.OraFine} | <b>Aula:</b> ${r.Aula}</p><p><b>UF:</b> ${r.UF} | <b>Modulo:</b> ${r.Modulo} | <b>Docente:</b> ${r.Docente} | <b>Ore:</b> ${r.Ore} | <b>Fase:</b> ${r.Fase}</p><hr><h4>Argomenti trattati:</h4><p contenteditable="true" style="min-height:60px;border:1px dashed #ccc;padding:8px">Inserisci argomenti...</p><h4 style="margin-top:15px">Firme Allievi (20):</h4><table border="1" style="width:100%;border-collapse:collapse;font-size:12px"><tr><th>#</th><th>Nome Allievo</th><th>Firma Entrata</th><th>Firma Uscita</th></tr>${Array.from({length:20},(_,i)=>`<tr><td>${i+1}</td><td contenteditable="true"></td><td></td><td></td></tr>`).join('')}</table><div style="margin-top:20px;display:flex;justify-content:space-between"><div>Firma Docente: ___________________________</div><div>Firma Tutor: ___________________________</div></div>`;
+}
+function showTab(name){
+  document.querySelectorAll('[id^="tab-"]').forEach(el=>el.style.display='none');
+  const target=document.getElementById('tab-'+name);
+  if(target) target.style.display='block';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(event && event.target) event.target.classList.add('active');
+  if(name==='moduli') renderModuli();
+  if(name==='docenti') renderDocenti();
+  if(name==='query') renderQuery();
+}
+function addRow(){
+  const last=calendario[calendario.length-1];
+  const newId=Math.max(...calendario.map(r=>r.ID))+1;
+  calendario.push({ID:newId,Data:last.Data,DataStr:last.DataStr,Giorno:last.Giorno,OraInizio:"09:00",OraFine:"13:00",Ore:4,UF:"Nuovo UF",Modulo:"Nuovo Modulo",Docente:"NUOVO DOCENTE",Fase:"AULA",Aula:"Aula 1"});
+  save(); renderCalendario();
+}
+function deleteRow(id){ if(confirm("Eliminare giornata ID "+id+"?")){ calendario=calendario.filter(r=>r.ID!==id); save(); renderCalendario(); } }
+function addModulo(){ moduli.push({UF:"Nuovo UF",Modulo:"Nuovo Modulo",Ore:10,Docente:"NUOVO DOCENTE"}); save(); renderModuli(); updateKPI(); }
+function deleteModulo(i){ if(confirm("Eliminare modulo?")){ moduli.splice(i,1); save(); renderModuli(); updateKPI(); } }
+function addDocente(){ const nome=prompt("Nome nuovo docente:"); if(nome){ moduli.push({UF:"Varie",Modulo:"Nuovo",Ore:0,Docente:nome}); save(); renderDocenti(); renderModuli(); } }
+function deleteDocente(doc){ if(confirm("Rimuovere docente "+doc+"?")){ calendario.forEach(r=>{ if(r.Docente===doc) r.Docente="DA DEFINIRE"; }); save(); renderCalendario(); renderDocenti(); } }
+function ricalcolaDate(){
+  const startEl=document.getElementById('startDate'); const start=startEl?startEl.value:"";
+  if(!start){ alert("Inserisci data inizio"); return; }
+  if(!confirm("Ricalcolare tutte le date da "+start+"?")) return;
+  const numAula=calendario.filter(r=>r.Fase==="AULA").length;
+  const numStage=calendario.filter(r=>r.Fase==="STAGE").length;
+  const {aulaDays, stageDays}=genDate(start,numAula,numStage);
+  let idx=0;
+  calendario.forEach(r=>{ if(r.Fase==="AULA"){ const d=aulaDays[idx++]; if(d){ r.Data=d.toISOString().slice(0,10); r.DataStr=d.toLocaleDateString('it-IT'); r.Giorno=["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"][d.getDay()]; } } });
+  idx=0;
+  calendario.forEach(r=>{ if(r.Fase==="STAGE"){ const d=stageDays[idx++]; if(d){ r.Data=d.toISOString().slice(0,10); r.DataStr=d.toLocaleDateString('it-IT'); r.Giorno=["Domenica","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato"][d.getDay()]; } } });
+  calendario.sort((a,b)=>a.Data.localeCompare(b.Data));
+  save(); renderCalendario();
+}
+function exportExcel(){
+  let csv="ID,Data,Giorno,OraInizio,OraFine,Ore,UF,Modulo,Docente,Fase,Aula\n";
+  calendario.forEach(r=>{ csv+=`${r.ID},${r.Data},${r.Giorno},${r.OraInizio},${r.OraFine},${r.Ore},"${r.UF.replace(/"/g,'""')}","${r.Modulo.replace(/"/g,'""')}","${r.Docente.replace(/"/g,'""')}",${r.Fase},${r.Aula}\n`; });
+  const blob=new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Calendario_MKTG_600h_modificato.csv'; a.click();
+}
+function exportJSON(){
+  const blob=new Blob([JSON.stringify({calendario,moduli},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Calendario_MKTG_600h.json'; a.click();
+}
+function exportSQL(){
+  let sql="-- SQL per Access\nCREATE TABLE Calendario (ID INTEGER, Data DATE, Giorno TEXT, OraInizio TEXT, OraFine TEXT, Ore INTEGER, UF TEXT, Modulo TEXT, Docente TEXT, Fase TEXT, Aula TEXT);\n";
+  calendario.forEach(r=>{ sql+=`INSERT INTO Calendario VALUES (${r.ID},#${r.Data}#, '${r.Giorno}', '${r.OraInizio}', '${r.OraFine}', ${r.Ore}, '${r.UF.replace(/'/g,"''")}', '${r.Modulo.replace(/'/g,"''")}', '${r.Docente.replace(/'/g,"''")}', '${r.Fase}', '${r.Aula}');\n`; });
+  const blob=new Blob([sql],{type:'text/plain'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='Calendario_MKTG_Access.sql'; a.click();
+}
+function resetData(){ if(confirm("Ripristinare dati originali? Perderai tutte le modifiche.")){ localStorage.removeItem(STORAGE_KEY); location.reload(); } }
+
+document.getElementById('toggleEdit').addEventListener('click', function(){
+  editMode=!editMode;
+  this.innerText=editMode?"✅ Modifica Attiva (clicca per disattivare)":"✏️ Attiva Modifica";
+  this.className=editMode?"btn btn-danger":"btn btn-primary";
+  document.getElementById('editBadge').style.display=editMode?"inline":"none";
+  renderCalendario(); renderModuli();
+});
+
+load(); updateKPI(); renderCalendario();
+</script>
+</body>
+</html>
